@@ -13,21 +13,21 @@ try:
     df = conn.read(spreadsheet=url, header=None)
     
     if not df.empty:
-        st.success("Sheet Connected Successfully!")
-        
-        # --- AUTO-FINDER LOGIC ---
-        # Sheet-la 'A', 'B', illa 'C' enga irukku-nu search pandrom
+        # --- SHIFT COLUMN FINDER ---
         shift_col = None
+        # Row 1-la irundhu Row 50 varai check pandrom (A, B, or C theda)
         for col in df.columns:
-            if df[col].astype(str).str.contains('^[ABC]$', regex=True, na=False).any():
+            if df[col].astype(str).str.strip().str.upper().isin(['A', 'B', 'C']).any():
                 shift_col = col
                 break
         
-        # Staff Names eppovum Shift column-kku munnadi (Left side) thaan irukkum
+        # Staff Names eppovum Shift column-kku munnadi (Left side) irukkum
         name_col = shift_col - 1 if shift_col and shift_col > 0 else 0
         
         if shift_col is not None:
-            # Data-vai clean pandrom
+            st.success("Sheet Scan Complete!")
+            
+            # Data cleaning
             df_clean = pd.DataFrame({
                 'NAME': df.iloc[:, name_col],
                 'SHIFT': df.iloc[:, shift_col]
@@ -39,13 +39,14 @@ try:
             selected_date = st.sidebar.number_input("Select Date", min_value=1, max_value=31, value=4)
 
             if st.sidebar.button("Generate Today's Chart"):
-                # Filter by shift (Case insensitive)
-                shift_data = df_clean[df_clean['SHIFT'].astype(str).str.upper() == selected_shift].copy()
+                # Filter by shift
+                shift_data = df_clean[df_clean['SHIFT'].astype(str).str.strip().str.upper() == selected_shift].copy()
                 
                 if not shift_data.empty:
                     # 13 point rotation logic
                     points = [f"Point {i}" for i in range(1, 14)]
                     shift_data = shift_data.reset_index(drop=True)
+                    # Logic: (Staff Index + Date) % 13
                     shift_data['Assigned Point'] = [points[(i + int(selected_date)) % 13] for i in range(len(shift_data))]
                     
                     st.subheader(f"Duty Chart for Date: {selected_date} | Shift: {selected_shift}")
@@ -53,7 +54,9 @@ try:
                 else:
                     st.warning(f"Shift '{selected_shift}' kaana staff yarum sheet-la illai.")
         else:
-            st.error("Sheet-la 'A', 'B', illa 'C' (Shift) irukkura column-ah kandupidiçha mudiyaala. Check your sheet data.")
+            st.error("Sheet-la 'A', 'B', illa 'C' (Shift) irukkura column-ah kandupidiçha mudiyaala. Please ensure your sheet has a column with just A, B, or C.")
+    else:
+        st.error("Sheet is empty!")
 
 except Exception as e:
-    st.error(f"Prachinai: {e}")
+    st.error(f"Error: {e}")
