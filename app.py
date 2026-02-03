@@ -14,46 +14,46 @@ try:
     
     if not df.empty:
         st.sidebar.header("Control Panel")
-        # Date selection (Date 3-ah default-ah veikkirom)
         date_val = st.sidebar.number_input("Select Date", 1, 31, 3)
         shift_val = st.sidebar.selectbox("Select Shift", ["A", "B", "C"])
 
-        # Row 1-la dates (1, 2, 3...) irukku. 
-        # So Date 1-na Column C (index 2), Date 2-na Column D (index 3)...
-        # Intha logic: Column Index = Selected Date + 1
-        try:
-            target_col_idx = date_val + 1 
-            
-            # Staff names Column B (Index 1)-la irukku
-            # Shift data andha date column-la irukku
-            staff_list = []
-            for i in range(1, len(df)): # Row 1 skip pandrom
-                name = str(df.iloc[i, 1]).strip()
-                s_shift = str(df.iloc[i, target_col_idx]).strip().upper()
+        # Column Mapping:
+        # Column B (Index 1) is Staff Name
+        # Column C (Index 2) is Shift / Attendance for Date 1
+        # Logic: Date 1 = Index 2, Date 2 = Index 3, Date 3 = Index 4...
+        target_col_idx = date_val + 1 
+
+        staff_list = []
+        # Row 2 (Index 1) la irundhu check pandrom
+        for i in range(1, len(df)):
+            try:
+                name = str(df.iloc[i, 1]).strip() # Column B
+                # Staff-oda shift status-ah edukkrom
+                attendance_val = str(df.iloc[i, target_col_idx]).strip().upper()
                 
-                if name and s_shift == shift_val:
+                # Inga thaan logic: 'A', 'B', illa 'C' match aaganum
+                if name and name != "None" and attendance_val == shift_val:
                     staff_list.append(name)
+            except:
+                continue
+        
+        if staff_list:
+            points = ["MAIN GATE", "SECOND GATE", "CAR PARKING", "CAR PARKING ENTRANCE", 
+                      "PATROLING", "DG", "C BLOCK", "B BLOCK", "A BLOCK", "CIVIL GATE", "NEW CANTEEN", "POINT 12", "POINT 13"]
             
-            if staff_list:
-                points = ["MAIN GATE", "SECOND GATE", "CAR PARKING", "CAR PARKING ENTRANCE", 
-                          "PATROLING", "DG", "C BLOCK", "B BLOCK", "A BLOCK", "CIVIL GATE", "NEW CANTEEN", "POINT 12", "POINT 13"]
-                
-                total_staff = len(staff_list)
-                start_idx = (date_val - 1) % total_staff
+            total_staff = len(staff_list)
+            # Date poruthu rotation start point maarum
+            start_idx = (date_val - 1) % total_staff
 
-                result = []
-                # Max 13 staff members-kku duty poduvom
-                for i in range(min(13, total_staff)):
-                    idx = (start_idx + i) % total_staff
-                    result.append([staff_list[idx], points[i]])
+            result = []
+            for i in range(min(13, total_staff)):
+                idx = (start_idx + i) % total_staff
+                result.append([staff_list[idx], points[i]])
 
-                st.subheader(f"📋 Duty Chart: Date {date_val} | Shift {shift_val}")
-                st.table(pd.DataFrame(result, columns=["Staff Name", "Duty Point"]))
-            else:
-                st.warning(f"Date {date_val} & Shift {shift_val}-kku staff list kaaliya irukku.")
-                
-        except Exception as col_err:
-            st.error(f"Column access error: {col_err}. Check if date column exists.")
-
+            st.subheader(f"📋 Duty Chart: Date {date_val} | Shift {shift_val}")
+            st.table(pd.DataFrame(result, columns=["Staff Name", "Duty Point"]))
+        else:
+            st.warning(f"Date {date_val} & Shift {shift_val}-kku staff yarum 'A/B/C' nu mark pannala. Check Column {chr(65+target_col_idx)} in your sheet.")
+            
 except Exception as e:
     st.error(f"Technical Error: {e}")
