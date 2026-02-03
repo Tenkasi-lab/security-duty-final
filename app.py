@@ -5,49 +5,53 @@ from streamlit_gsheets import GSheetsConnection
 st.set_page_config(page_title="Security Duty Rotation", layout="centered")
 st.title("🛡️ Security Duty Rotation")
 
-# Google Sheets connect
 conn = st.connection("gsheets", type=GSheetsConnection)
+url = "https://docs.google.com/spreadsheets/d/1v95g8IVPITIF4-mZghIvh1wyr5YUxHGmgK3jyWhtuEQ/"
 
-# Full sheet read
-df = conn.read(worksheet=0, ttl=0)
+try:
+    # Spreadsheet-ai padikkirom
+    df = conn.read(spreadsheet=url)
+    
+    # Column names-ah string-ah mathikkurom (Error varama irukka)
+    df.columns = [str(c).strip() for c in df.columns]
 
-# User input
-date = st.sidebar.number_input("Date select pannunga (1–31)", 1, 31, 4)
-shift = st.sidebar.selectbox("Shift select pannunga", ["A", "B", "C"])
+    st.sidebar.header("Control Panel")
+    date_val = st.sidebar.number_input("Date select pannunga (1–31)", 1, 31, 4)
+    shift_val = st.sidebar.selectbox("Shift select pannunga", ["A", "B", "C"])
 
-# Date column name
-date_col = str(date)
+    date_col = str(date_val)
 
-if date_col not in df.columns:
-    st.error(f"Date {date} column sheet-la illa. Row 1-la dates irukka-nu check pannunga.")
-else:
-    # Column B (index 1) la Name irukku 
-    staff_df = df.iloc[:, [1, df.columns.get_loc(date_col)]]
-    staff_df.columns = ["Staff Name", "Shift"]
-
-    # Clean data
-    staff_df = staff_df.dropna()
-    staff_df["Shift"] = staff_df["Shift"].astype(str).str.upper()
-
-    # Filter by shift
-    target_staff = staff_df[staff_df["Shift"] == shift].reset_index(drop=True)
-
-    if target_staff.empty:
-        st.warning(f"Inniku (Date {date}) Shift {shift}-la staff yarum illai.")
+    if date_col not in df.columns:
+        st.error(f"⚠️ Error: Column '{date_col}' sheet-la illa. Row 1-la dates (1, 2, 3...) irukka-nu check pannunga.")
     else:
-        # 13 points rotation logic
-        points = ["MAIN GATE", "SECOND GATE", "CAR PARKING", "CAR PARKING ENTRANCE", 
-                  "PATROLING", "DG", "C BLOCK", "B BLOCK", "A BLOCK", "CIVIL GATE", "NEW CANTEEN", "POINT 12", "POINT 13"]
-        
-        total_staff = len(target_staff)
-        start = (date - 1) % total_staff
+        # Column B (Index 1) la Names irukku nu assumption
+        # Unga sheet structure-kku yetha maari columns-ah edukirom
+        staff_df = df.iloc[:, [1, df.columns.get_loc(date_col)]]
+        staff_df.columns = ["Staff Name", "Shift"]
 
-        result = []
-        for i in range(13):
-            idx = (start + i) % total_staff
-            result.append([target_staff.loc[idx, "Staff Name"], points[i]])
+        # Empty names-ah remove pandrom
+        staff_df = staff_df.dropna(subset=["Staff Name"])
+        staff_df["Shift"] = staff_df["Shift"].astype(str).str.strip().str.upper()
 
-        result_df = pd.DataFrame(result, columns=["Staff Name", "Duty Point"])
+        # Shift filter
+        target_staff = staff_df[staff_df["Shift"] == shift_val].reset_index(drop=True)
 
-        st.subheader(f"📋 Duty Chart: Date {date} | Shift {shift}")
-        st.table(result_df)
+        if target_staff.empty:
+            st.warning(f"Inniku (Date {date_val}) Shift {shift_val}-la staff yarum illai.")
+        else:
+            points = ["MAIN GATE", "SECOND GATE", "CAR PARKING", "CAR PARKING ENTRANCE", 
+                      "PATROLING", "DG", "C BLOCK", "B BLOCK", "A BLOCK", "CIVIL GATE", "NEW CANTEEN", "POINT 12", "POINT 13"]
+            
+            total_staff = len(target_staff)
+            start_idx = (date_val - 1) % total_staff
+
+            result = []
+            for i in range(min(13, total_staff)):
+                idx = (start_idx + i) % total_staff
+                result.append([target_staff.loc[idx, "Staff Name"], points[i]])
+
+            st.subheader(f"📋 Duty Chart: Date {date_val} | Shift {shift_val}")
+            st.table(pd.DataFrame(result, columns=["Staff Name", "Duty Point"]))
+
+except Exception as e:
+    st.error(f"Prachinai: {e}")
